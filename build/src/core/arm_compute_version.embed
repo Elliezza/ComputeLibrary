@@ -1,0 +1,1 @@
+"arm_compute_version=v18.08 Build options: {'arch': 'arm64-v8a', 'opencl': '1', 'neon': '1', 'examples': '1', 'asserts': '0', 'debug': '0', 'os': 'linux', 'Werror': '1'} Git hash=f06ed1fd13d69fff1370973a3b34efd312d00e96"

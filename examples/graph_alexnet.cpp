@@ -170,7 +170,7 @@ public:
     {
         // Run graph
         graph.run();
-	std::cout<<"Hello!"<<endl;
+	std::cout<<"Hello!"<<std::endl;
     }
 
 private:

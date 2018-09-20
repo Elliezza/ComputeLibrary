@@ -31,6 +31,14 @@ using namespace arm_compute::utils;
 using namespace arm_compute::graph::frontend;
 using namespace arm_compute::graph_utils;
 
+#include <sched.h>
+#include <unistd.h>
+
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+
+
 /** Example demonstrating how to implement LeNet's network using the Compute Library's graph API
  *
  * @param[in] argc Number of arguments
@@ -117,11 +125,23 @@ public:
 
         return true;
     }
+    
     void do_run() override
     {
-        // Run graph
-        graph.run();
+	    graph.run();
+
+	    std::cout << "Starting of running the kernel" << std::endl;             
+	    auto tbegin = std::chrono::high_resolution_clock::now();        
+	    for(int i=0; i<20; i++){
+		    graph.run();
+	    }
+	    auto tend = std::chrono::high_resolution_clock::now();
+	    double cost0 = std::chrono::duration_cast<std::chrono::duration<double>>(tend - tbegin).count();
+	    double cost = cost0/20;
+
+	    std::cout << "COST:" << cost << std::endl;
     }
+
 
 private:
     CommandLineParser  cmd_parser;

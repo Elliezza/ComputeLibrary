@@ -119,7 +119,10 @@ public:
 
     /** Function ran by the worker thread. */
     void worker_thread();
+    int getId();
+    void setId(int id);
 
+    std::thread& get_std_thread() {return _thread;}
 private:
     std::thread                        _thread{};
     ThreadInfo                         _info{};
@@ -130,9 +133,11 @@ private:
     bool                               _wait_for_work{ false };
     bool                               _job_complete{ true };
     std::exception_ptr                 _current_exception{ nullptr };
+    int _threadID;
 };
 
 CPPScheduler::Thread::Thread()
+	:_threadID()
 {
     _thread = std::thread(&Thread::worker_thread, this);
 }
@@ -146,6 +151,16 @@ CPPScheduler::Thread::~Thread()
         start(nullptr, feeder, ThreadInfo());
         _thread.join();
     }
+}
+
+int CPPScheduler::Thread::getId()
+{
+	return _threadID;
+}
+
+void CPPScheduler::Thread::setId(int id)
+{	       
+       	_threadID = id;
 }
 
 void CPPScheduler::Thread::start(std::vector<IScheduler::Workload> *workloads, ThreadFeeder &feeder, const ThreadInfo &info)
@@ -213,15 +228,35 @@ CPPScheduler &CPPScheduler::get()
 
 CPPScheduler::CPPScheduler()
     : _num_threads(num_threads_hint()),
-      _threads(_num_threads - 1)
+      _threads(_num_threads)
 {
     get_cpu_configuration(_cpu_info);
+        
+    unsigned int i, j;
+    int rc;
+
+    set_num_threads(8); //always create 8 threads
+
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset); //clearing cpuset
+    auto thread_it =  _threads.begin();
+
+    for(i=0, j=0; j < _num_threads; i++) {
+		  
+	    CPU_ZERO(&cpuset);
+	    CPU_SET(i, &cpuset);
+	    rc = pthread_setaffinity_np(thread_it->get_std_thread().native_handle(), sizeof(cpu_set_t), &cpuset);
+	    thread_it->setId(i);
+	    if(rc != 0) std::cout << "Error in calling pthread_setaffinity_np " << rc << std::endl;
+	    std::cout << "created thread " << thread_it->getId() << " on core: " << i << std::endl;
+	    ++thread_it; j++;
+    }
 }
 
 void CPPScheduler::set_num_threads(unsigned int num_threads)
 {
     _num_threads = num_threads == 0 ? num_threads_hint() : num_threads;
-    _threads.resize(_num_threads - 1);
+    _threads.resize(_num_threads);
 }
 
 unsigned int CPPScheduler::num_threads() const
@@ -231,32 +266,52 @@ unsigned int CPPScheduler::num_threads() const
 
 void CPPScheduler::run_workloads(std::vector<IScheduler::Workload> &workloads)
 {
-    const unsigned int num_threads = std::min(_num_threads, static_cast<unsigned int>(workloads.size()));
+
+    const unsigned int num_threads_new = 4;	
+    const unsigned int num_threads = std::min(num_threads_new, static_cast<unsigned int>(workloads.size())); //resize the thread count to 4
+
     if(num_threads < 1)
     {
         return;
     }
+
     ThreadFeeder feeder(num_threads, workloads.size());
     ThreadInfo   info;
     info.cpu_info          = &_cpu_info;
     info.num_threads       = num_threads;
     unsigned int t         = 0;
     auto         thread_it = _threads.begin();
-    for(; t < num_threads - 1; ++t, ++thread_it)
+    bool big_cluster = false;    
+
+
+    if(sched_getcpu()>3) big_cluster=true;
+
+    if(big_cluster) for(t=0; t < 4; ++t, ++thread_it);   	
+
+    for(t=0; t < num_threads; ++t, ++thread_it)
     {
         info.thread_id = t;
+	std::cout << "thread ID: "<< thread_it->getId() << " index: "<< info.thread_id << std::endl;
         thread_it->start(&workloads, feeder, info);
     }
 
-    info.thread_id = t;
-    process_workloads(workloads, feeder, info);
+   // info.thread_id = t;
+   // process_workloads(workloads, feeder, info);
 
     try
     {
-        for(auto &thread : _threads)
+        /*for(auto &thread : _threads)
         {
             thread.wait();
-        }
+        }*/
+
+	auto thread = _threads.begin();
+	if(big_cluster) for(t=0; t < 4; ++thread, ++t);
+			                
+	for(t=0; t < num_threads; ++t, ++thread)
+	{
+		thread->wait();
+	}
     }
     catch(const std::system_error &e)
     {
@@ -268,19 +323,23 @@ void CPPScheduler::schedule(ICPPKernel *kernel, const Hints &hints)
 {
     ARM_COMPUTE_ERROR_ON_MSG(!kernel, "The child class didn't set the kernel");
 
+    const unsigned int num_threads_new = 4;
     const Window      &max_window     = kernel->window();
     const unsigned int num_iterations = max_window.num_iterations(hints.split_dimension());
-    const unsigned int num_threads    = std::min(num_iterations, _num_threads);
+    const unsigned int num_threads    = std::min(num_iterations, num_threads_new);
 
     if(num_iterations == 0)
     {
         return;
     }
 
+    std::cout << kernel->name() << std::endl;
+
     if(!kernel->is_parallelisable() || num_threads == 1)
     {
         ThreadInfo info;
         info.cpu_info = &_cpu_info;
+	std::cout << "No partition, on core " << sched_getcpu() << std::endl;
         kernel->run(max_window, info);
     }
     else

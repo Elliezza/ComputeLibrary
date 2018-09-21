@@ -224,6 +224,8 @@ void call_all_tasks(ExecutionWorkload &workload)
 {
     ARM_COMPUTE_ERROR_ON(workload.ctx == nullptr);
 
+ //   static double total=0, active=0, batch=0, conv=0, dcon =0, depth_conv=0, elt=0, flat=0, fc=0, norm=0, pool=0, reshape=0, scale=0, smax=0, split=0;
+
     // Acquire memory for the transition buffers
     for(auto &mm_ctx : workload.ctx->memory_managers())
     {
@@ -236,8 +238,49 @@ void call_all_tasks(ExecutionWorkload &workload)
     // Execute tasks
     for(auto &task : workload.tasks)
     {
+	    
+//	auto tbegin = std::chrono::high_resolution_clock::now();
         task();
+//	auto tend = std::chrono::high_resolution_clock::now();	
+//	double cost = std::chrono::duration_cast<std::chrono::duration<double>> (tend - tbegin).count();
+
+/*	std::cout << "Node info: ID: " << task.node->id() << ", type: " << (int) task.node->type() << ", cost: "  << cost << std::endl;
+	total += cost;
+	if((int)task.node->type() == 0) active += cost;
+	if((int)task.node->type() == 1) batch += cost;
+	if((int)task.node->type() == 4) conv += cost;
+	if((int)task.node->type() == 5) dcon += cost;
+	if((int)task.node->type() == 6) depth_conv += cost;
+	if((int)task.node->type() == 7) elt += cost;
+	if((int)task.node->type() == 8) flat += cost;
+	if((int)task.node->type() == 9) fc += cost;
+	if((int)task.node->type() == 10) norm += cost;
+	if((int)task.node->type() == 12) pool += cost;
+	if((int)task.node->type() == 13) reshape += cost;
+	if((int)task.node->type() == 14) scale += cost;
+	if((int)task.node->type() == 15) smax += cost;
+	if((int)task.node->type() == 16) split += cost;
+*/
+
     }
+
+ /*   std::cout << "Summary: " << std::endl
+	    << "Total time: " << total << std::endl
+	    << "ActivationLayer: " << active << std::endl
+	    << "BatchNormalizationLayer: " << batch << std::endl
+	    << "ConvolutionLayer: " << conv << std::endl
+	    << "DeconvolutionLayer: " << dcon << std::endl
+	    << "DepthwiseConvolutionLayer: " << depth_conv << std::endl
+	    << "EltwiseLayer: " << elt << std::endl
+	    << "FlattenLayer: " << flat << std::endl
+	    << "FullyConnectedLayer: " << fc << std::endl
+	    << "NormalizationLayer: " << norm << std::endl
+	    << "PoolingLayer: " << pool << std::endl
+	    << "ReshapeLayer: " << reshape << std::endl
+	    << "ResizeLayer: " << scale << std::endl
+	    << "SoftmaxLayer: " << smax << std::endl
+	    << "SplitLayer: " << split << std::endl;
+*/
 
     // Release memory for the transition buffers
     for(auto &mm_ctx : workload.ctx->memory_managers())

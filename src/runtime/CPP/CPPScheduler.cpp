@@ -235,13 +235,14 @@ CPPScheduler::CPPScheduler()
     unsigned int i, j;
     int rc;
 
-    set_num_threads(8); //always create 8 threads
+    unsigned int num_threads = 8;
+    set_num_threads(num_threads); //always create 8 threads
 
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset); //clearing cpuset
     auto thread_it =  _threads.begin();
 
-    for(i=0, j=0; j < _num_threads; i++) {
+    for(i=0, j=0; j < num_threads; i++) {
 		  
 	    CPU_ZERO(&cpuset);
 	    CPU_SET(i, &cpuset);
@@ -266,9 +267,8 @@ unsigned int CPPScheduler::num_threads() const
 
 void CPPScheduler::run_workloads(std::vector<IScheduler::Workload> &workloads)
 {
-
-    const unsigned int num_threads_new = 4;	
-    const unsigned int num_threads = std::min(num_threads_new, static_cast<unsigned int>(workloads.size())); //resize the thread count to 4
+    const unsigned int num_involved_threads = 4;
+    const unsigned int num_threads = std::min(num_involved_threads, static_cast<unsigned int>(workloads.size())); //resize the thread count to 4
 
     if(num_threads < 1)
     {
@@ -323,17 +323,17 @@ void CPPScheduler::schedule(ICPPKernel *kernel, const Hints &hints)
 {
     ARM_COMPUTE_ERROR_ON_MSG(!kernel, "The child class didn't set the kernel");
 
-    const unsigned int num_threads_new = 4;
+    const unsigned int num_involved_threads = 4;
     const Window      &max_window     = kernel->window();
     const unsigned int num_iterations = max_window.num_iterations(hints.split_dimension());
-    const unsigned int num_threads    = std::min(num_iterations, num_threads_new);
+    const unsigned int num_threads    = std::min(num_iterations, num_involved_threads);
 
     if(num_iterations == 0)
     {
         return;
     }
 
-    std::cout << kernel->name() << std::endl;
+    std::cout << kernel->name() << ", Thread counts: "<< num_threads <<std::endl;
 
     if(!kernel->is_parallelisable() || num_threads == 1)
     {

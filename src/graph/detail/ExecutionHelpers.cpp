@@ -29,6 +29,13 @@
 #include "arm_compute/graph/Tensor.h"
 #include "arm_compute/graph/backends/BackendRegistry.h"
 
+#include "arm_compute/runtime/CPUUtils.h"
+
+#include <chrono>
+#include <iostream>
+#include <fstream>
+#include <string>
+
 namespace arm_compute
 {
 namespace graph
@@ -52,6 +59,8 @@ void validate_all_nodes(Graph &g)
     }
 }
 
+unsigned int _split = 1; //split from layer X
+
 void configure_all_tensors(Graph &g)
 {
     auto &tensors = g.tensors();
@@ -67,6 +76,20 @@ void configure_all_tensors(Graph &g)
             tensor->set_handle(std::move(handle));
         }
     }
+
+
+    // split is read from file       
+    std::ifstream iffactor;	    
+    iffactor.open("/root/.hikey960/split", std::ios::in);	        
+    if(iffactor.is_open()){			            
+	    std::string line;
+	    while(bool(getline(iffactor,line))) {
+		    if(line.empty()) continue;
+		    _split = std::stod(line,nullptr);
+	    }
+    }
+    iffactor.close();
+    std::cout << "Setting split at layer: " << _split << std::endl;
 }
 
 void allocate_all_input_tensors(INode &node)
@@ -220,6 +243,12 @@ void prepare_all_tasks(ExecutionWorkload &workload)
     }
 }
 
+
+std::mutex allc_mutex_0;
+std::mutex allc_mutex_4;
+std::mutex common_mutex;
+
+
 void call_all_tasks(ExecutionWorkload &workload)
 {
     ARM_COMPUTE_ERROR_ON(workload.ctx == nullptr);
@@ -235,15 +264,49 @@ void call_all_tasks(ExecutionWorkload &workload)
         }
     }
 
+        cpu_set_t cpuset0;	    
+	cpu_set_t cpuset4;
+
+	CPU_ZERO(&cpuset0);
+	CPU_ZERO(&cpuset4);
+
+	CPU_SET(0, &cpuset0);
+	CPU_SET(4, &cpuset4);
+
+	pthread_t current_thread;
+
     // Execute tasks
     for(auto &task : workload.tasks)
     {
+
+
+	    if (&task == &workload.tasks.front()){
+		    allc_mutex_4.lock();
+		    current_thread = pthread_self();
+		    int rc= pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset4);
+		    if (rc !=0) std::cout << "Error in setting affinity for thread " << sched_getcpu() << std::endl;
+	    }
+	    if(task.node->id() == _split) {
+		    allc_mutex_4.unlock();
+		    allc_mutex_0.lock();
+		    current_thread = pthread_self();
+		    int rc= pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset0);   
+		    if (rc !=0) std::cout << "Error in setting affinity for thread " << sched_getcpu() << std::endl;
+	    }
+
+
+	    
 	    
 //	auto tbegin = std::chrono::high_resolution_clock::now();
         task();
 //	auto tend = std::chrono::high_resolution_clock::now();	
 //	double cost = std::chrono::duration_cast<std::chrono::duration<double>> (tend - tbegin).count();
 
+	 if (&task == &workload.tasks.back()){	
+		 allc_mutex_0.unlock();
+	 }
+
+	std::cout << "Node info: ID: " << task.node->id() << ", type: " << (int) task.node->type() << std::endl;
 /*	std::cout << "Node info: ID: " << task.node->id() << ", type: " << (int) task.node->type() << ", cost: "  << cost << std::endl;
 	total += cost;
 	if((int)task.node->type() == 0) active += cost;

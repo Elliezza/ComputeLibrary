@@ -280,7 +280,14 @@ void call_all_tasks(ExecutionWorkload &workload)
     {
 
 
-	    if (&task == &workload.tasks.front()){
+
+	if(workload.graph->id().get() == 2) //for CL implementation
+	{
+		task();
+
+	}else {
+
+		if (&task == &workload.tasks.front()){
 		    allc_mutex_4.lock();
 		    current_thread = pthread_self();
 		    int rc= pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset4);
@@ -306,7 +313,9 @@ void call_all_tasks(ExecutionWorkload &workload)
 		 allc_mutex_0.unlock();
 	 }
 
-	std::cout << "Node info: ID: " << task.node->id() << ", type: " << (int) task.node->type() << std::endl;
+	} //else end
+
+	std::cout << "Node info: ID: " << task.node->id() << ", type: " << (int) task.node->type() << "Graph: "<< workload.graph->id().get() << std::endl;
 /*	std::cout << "Node info: ID: " << task.node->id() << ", type: " << (int) task.node->type() << ", cost: "  << cost << std::endl;
 	total += cost;
 	if((int)task.node->type() == 0) active += cost;
@@ -325,7 +334,7 @@ void call_all_tasks(ExecutionWorkload &workload)
 	if((int)task.node->type() == 16) split += cost;
 */
 
-    }
+    } //for end
 
  /*   std::cout << "Summary: " << std::endl
 	    << "Total time: " << total << std::endl

@@ -75,9 +75,11 @@ public:
 
 	graph0 << common_params.target;
 	graph1 << common_params.target;
+	graph2 << Target::CL;
 
 	initialize_graph(graph0);
 	initialize_graph(graph1);
+	initialize_graph(graph2);
 
         // Finalize graph
         GraphConfig config;
@@ -87,6 +89,7 @@ public:
 
 	graph0.finalize(common_params.target, config);
 	graph1.finalize(common_params.target, config);
+	graph2.finalize(Target::CL, config);
 
 
         return true;
@@ -96,7 +99,7 @@ public:
     {
 	    std::cout << "Starting of running the kernel" << std::endl; 
 
-	    int num_cores = 2;
+	    int num_cores = 3;
 	    int k = 4;
 	    std::vector<std::thread> workers(num_cores);
 
@@ -106,15 +109,17 @@ public:
 				    {
 				    std::cout << "Creating new threads: " << i << " on CPU:" << sched_getcpu() << std::endl;
 				    if (i == 0) {
-				    for (int j = 0; j < 10; j++) graph0.run();
+				    for (int j = 0; j < 8; j++) graph0.run();
 				    } else if (i == 1){
-				    for (int j = 0; j < 10; j++) graph1.run();
+				    for (int j = 0; j < 8; j++) graph1.run();
+				    } else if (i == 2){
+				    for (int j = 0; j < 40; j++) graph2.run();
 				    }
 				    }});
 		    cpu_set_t cpuset;
 		    CPU_ZERO(&cpuset);
-		    if (i==1) {
-			    CPU_SET((i), &cpuset);
+		    if (i==2) {
+			    CPU_SET(i, &cpuset);
 		    } 
 		    else{
 			    CPU_SET((k+i), &cpuset);}
@@ -125,18 +130,19 @@ public:
 
 	    auto tend = std::chrono::high_resolution_clock::now();
 	    double cost0 = std::chrono::duration_cast<std::chrono::duration<double>>(tend - tbegin).count();
-	    double cost = cost0/20;
+	    double cost = cost0/56;
 
 	    std::cout << "COST:" << cost << std::endl;
     }
 
 
 private:
-    CommandLineParser  cmd_parser;
-    CommonGraphOptions common_opts;
-    CommonGraphParams  common_params;
-    Stream             graph0;
+    CommandLineParser   cmd_parser;
+    CommonGraphOptions  common_opts;
+    CommonGraphParams   common_params;
+    Stream              graph0;
     Stream		graph1{1, "SqueezeNetV1"};
+    Stream              graph2{2, "SqueezeNetV1"};
 	    
 	   
     void initialize_graph(Stream &graph)

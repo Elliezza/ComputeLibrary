@@ -291,7 +291,7 @@ void CPPScheduler::run_workloads(std::vector<IScheduler::Workload> &workloads)
     for(t=0; t < num_threads; ++t, ++thread_it)
     {
         info.thread_id = t;
-	std::cout << "thread ID: "<< thread_it->getId() << " index: "<< info.thread_id << std::endl;
+//	std::cout << "thread ID: "<< thread_it->getId() << " index: "<< info.thread_id << std::endl;
         thread_it->start(&workloads, feeder, info);
     }
 
@@ -333,13 +333,13 @@ void CPPScheduler::schedule(ICPPKernel *kernel, const Hints &hints)
         return;
     }
 
-    std::cout << kernel->name() << ", Thread counts: "<< num_threads <<std::endl;
+   // std::cout << kernel->name() << ", Thread counts: "<< num_threads <<std::endl;
 
     if(!kernel->is_parallelisable() || num_threads == 1)
     {
         ThreadInfo info;
         info.cpu_info = &_cpu_info;
-	std::cout << "No partition, on core " << sched_getcpu() << std::endl;
+//	std::cout << "No partition, on core " << sched_getcpu() << std::endl;
         kernel->run(max_window, info);
     }
     else
